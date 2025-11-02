@@ -1,0 +1,143 @@
+﻿generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  name          String
+  email         String   @unique
+  passwordHash  String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  roles         ProjectUserRole[]
+  timeEntries   TimeEntry[]
+  comments      TaskComment[]
+  downloads     FileDownloadLog[]
+}
+
+model Project {
+  id            String   @id @default(cuid())
+  name          String
+  description   String?
+  createdById   String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  publicationDone Boolean  @default(false)
+
+  tasks         Task[]
+  members       ProjectUserRole[]
+  files         FileAsset[]
+}
+
+model ProjectUserRole {
+  id         String   @id @default(cuid())
+  project    Project  @relation(fields: [projectId], references: [id])
+  projectId  String
+  user       User     @relation(fields: [userId], references: [id])
+  userId     String
+  role       Role
+  lastAccessAt DateTime?
+
+  @@index([projectId])
+  @@index([userId])
+}
+
+enum Role {
+  ADMIN
+  DEVELOPER
+  CLIENT
+}
+
+model Task {
+  id           String   @id @default(cuid())
+  project      Project  @relation(fields: [projectId], references: [id])
+  projectId    String
+  title        String
+  description  String?
+  status       TaskStatus @default(NOT_STARTED)
+  createdById  String
+  assignedToId String?
+  openedAt     DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  finishedAt   DateTime?
+  hoursTracked Int        @default(0) // em segundos
+
+  timeEntries  TimeEntry[]
+  comments     TaskComment[]
+  contributors TaskContributor[]
+
+  @@index([projectId])
+  @@index([status])
+}
+
+enum TaskStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  DONE
+}
+
+model TimeEntry {
+  id        String   @id @default(cuid())
+  task      Task     @relation(fields: [taskId], references: [id])
+  taskId    String
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  startedAt DateTime
+  stoppedAt DateTime?
+  duration  Int? // em segundos
+}
+
+model TaskComment {
+  id        String   @id @default(cuid())
+  task      Task     @relation(fields: [taskId], references: [id])
+  taskId    String
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  message   String
+  createdAt DateTime @default(now())
+  parentId  String?
+}
+
+model TaskContributor {
+  id            String   @id @default(cuid())
+  task          Task     @relation(fields: [taskId], references: [id])
+  taskId        String
+  user          User     @relation(fields: [userId], references: [id])
+  userId        String
+  firstAccessAt DateTime @default(now())
+  lastAccessAt  DateTime @default(now())
+}
+
+model FileAsset {
+  id          String   @id @default(cuid())
+  project     Project  @relation(fields: [projectId], references: [id])
+  projectId   String
+  key         String
+  name        String
+  sizeBytes   Int
+  contentType String
+  uploadedBy  String
+  uploadedAt  DateTime @default(now())
+  checksum    String?
+  downloads   FileDownloadLog[]
+
+  @@index([projectId])
+}
+
+model FileDownloadLog {
+  id           String   @id @default(cuid())
+  file         FileAsset @relation(fields: [fileId], references: [id])
+  fileId       String
+  user         User     @relation(fields: [userId], references: [id])
+  userId       String
+  downloadedAt DateTime @default(now())
+  ip           String?
+  userAgent    String?
+}
